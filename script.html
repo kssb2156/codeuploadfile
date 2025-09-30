@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการไฟล์ - Multi Server</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .server-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .server1 { background: #dbeafe; color: #1e40af; }
+        .server2 { background: #dcfce7; color: #166534; }
+        .server3 { background: #fef3c7; color: #92400e; }
+        
+        /* Toast Notification Styles */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            min-width: 300px;
+            max-width: 500px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            transform: translateX(400px);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+        
+        .toast.warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+        
+        .toast.info {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+        
+        .toast-icon {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+        }
+        
+        .toast-content {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .toast-close {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        
+        .toast-close:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
+    <!-- Login Page -->
+    <div id="loginPage" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md fade-in">
+            <div class="text-center mb-8">
+                <div class="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800">ระบบจัดการไฟล์</h1>
+                <p class="text-gray-600 mt-2">เข้าสู่ระบบเพื่อจัดการไฟล์</p>
+                
+                <div class="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                    <p><strong>ลองรับไฟล์ .jpg, .pdf, .png, .xlxs:</strong></p>
+
+                </div>
+            </div>
+            
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อผู้ใช้</label>
+                    <input type="text" id="username" required 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                           placeholder="กรอกชื่อผู้ใช้">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">รหัสผ่าน</label>
+                    <input type="password" id="password" required 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                           placeholder="กรอกรหัสผ่าน">
+                </div>
+                
+                <button type="submit" id="loginBtn" 
+                        class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                    เข้าสู่ระบบ
+                </button>
+            </form>
+            
+            <div id="loginError" class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg hidden">
+                ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center">
+                        <div class="bg-blue-600 w-8 h-8 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <h1 class="text-xl font-semibold text-gray-800">ระบบจัดการไฟล์</h1>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <span id="userInfo" class="text-sm text-gray-600"></span>
+                        <button id="logoutBtn" class="text-gray-500 hover:text-gray-700 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Server Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
+                    <div class="flex items-center">
+                        <div class="bg-blue-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Server 1</p>
+                            <p class="text-2xl font-bold text-gray-900" id="server1Files">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
+                    <div class="flex items-center">
+                        <div class="bg-green-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Server 2</p>
+                            <p class="text-2xl font-bold text-gray-900" id="server2Files">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
+                    <div class="flex items-center">
+                        <div class="bg-yellow-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Server 3</p>
+                            <p class="text-2xl font-bold text-gray-900" id="server3Files">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-4 mb-8">
+                <button id="uploadBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    อัปโหลดไฟล์
+                </button>
+                
+                <button id="manageUsersBtn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center hidden">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                    </svg>
+                    จัดการผู้ใช้
+                </button>
+            </div>
+
+            <!-- Files Table -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">ไฟล์ล่าสุด</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อไฟล์</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เซิร์ฟเวอร์</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เจ้าของ</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ขนาด</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่อัปโหลด</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">การดำเนินการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="filesTable" class="bg-white divide-y divide-gray-200">
+                            <!-- Files will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-medium text-gray-900">อัปโหลดไฟล์</h3>
+                <button id="closeUploadModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="uploadForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">เลือกเซิร์ฟเวอร์</label>
+                    <select id="serverSelect" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">-- เลือกเซิร์ฟเวอร์ --</option>
+                        <option value="server1">Server 1</option>
+                        <option value="server2">Server 2</option>
+                        <option value="server3">Server 3</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">เลือกไฟล์</label>
+                    <input type="file" id="fileInput" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <button type="submit" id="uploadSubmitBtn" 
+                        class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                    อัปโหลด
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Management Modal -->
+    <div id="userModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 fade-in max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-medium text-gray-900">จัดการผู้ใช้</h3>
+                <button id="closeUserModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="mb-6">
+                <button id="addUserBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium">
+                    เพิ่มผู้ใช้ใหม่
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อผู้ใช้</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">บทบาท</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">การดำเนินการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTable" class="bg-white divide-y divide-gray-200">
+                        <!-- Users will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-medium text-gray-900">เพิ่มผู้ใช้ใหม่</h3>
+                <button id="closeAddUserModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="addUserForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อผู้ใช้</label>
+                    <input type="text" id="newUsername" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                           placeholder="กรอกชื่อผู้ใช้">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">รหัสผ่าน</label>
+                    <input type="password" id="newPassword" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                           placeholder="กรอกรหัสผ่าน">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">บทบาท</label>
+                    <select id="newRole" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        <option value="user">ผู้ใช้</option>
+                        <option value="admin">ผู้ดูแลระบบ</option>
+                    </select>
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button type="button" id="cancelAddUser" 
+                            class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" id="submitAddUser" 
+                            class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium">
+                        เพิ่มผู้ใช้
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentUser = null;
+        let currentRole = null;
+        
+        // Cache for data
+        let usersCache = [];
+        let filesCache = [];
+
+        // DOM elements
+        const loginPage = document.getElementById('loginPage');
+        const dashboard = document.getElementById('dashboard');
+        const loginForm = document.getElementById('loginForm');
+        const loginError = document.getElementById('loginError');
+        const userInfo = document.getElementById('userInfo');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const manageUsersBtn = document.getElementById('manageUsersBtn');
+        const uploadModal = document.getElementById('uploadModal');
+        const userModal = document.getElementById('userModal');
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            setupEventListeners();
+        });
+
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 4000) {
+            // Remove existing toasts
+            const existingToasts = document.querySelectorAll('.toast');
+            existingToasts.forEach(toast => toast.remove());
+            
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // Icons for different types
+            const icons = {
+                success: `<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>`,
+                error: `<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>`,
+                warning: `<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>`,
+                info: `<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>`
+            };
+            
+            toast.innerHTML = `
+                ${icons[type]}
+                <div class="toast-content">${message}</div>
+                <svg class="toast-close" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            `;
+            
+            // Add to document
+            document.body.appendChild(toast);
+            
+            // Show toast
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            // Auto hide
+            const autoHide = setTimeout(() => hideToast(toast), duration);
+            
+            // Manual close
+            toast.querySelector('.toast-close').addEventListener('click', () => {
+                clearTimeout(autoHide);
+                hideToast(toast);
+            });
+        }
+        
+        function hideToast(toast) {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }
+
+        function setupEventListeners() {
+            // Login form
+            loginForm.addEventListener('submit', handleLogin);
+            
+            // Logout
+            logoutBtn.addEventListener('click', handleLogout);
+            
+            // Upload modal
+            uploadBtn.addEventListener('click', () => uploadModal.classList.remove('hidden'));
+            document.getElementById('closeUploadModal').addEventListener('click', () => uploadModal.classList.add('hidden'));
+            document.getElementById('uploadForm').addEventListener('submit', handleFileUpload);
+            
+            // User management modal
+            manageUsersBtn.addEventListener('click', () => {
+                userModal.classList.remove('hidden');
+                loadUsers();
+            });
+            document.getElementById('closeUserModal').addEventListener('click', () => userModal.classList.add('hidden'));
+            document.getElementById('addUserBtn').addEventListener('click', () => {
+                document.getElementById('addUserModal').classList.remove('hidden');
+            });
+            
+            // Add user modal
+            document.getElementById('closeAddUserModal').addEventListener('click', () => {
+                document.getElementById('addUserModal').classList.add('hidden');
+            });
+            document.getElementById('cancelAddUser').addEventListener('click', () => {
+                document.getElementById('addUserModal').classList.add('hidden');
+            });
+            document.getElementById('addUserForm').addEventListener('submit', handleAddUser);
+        }
+
+        function checkAuth() {
+            const user = sessionStorage.getItem('currentUser');
+            const role = sessionStorage.getItem('currentRole');
+            
+            if (user && role) {
+                currentUser = user;
+                currentRole = role;
+                showDashboard();
+            } else {
+                showLogin();
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            // Show loading
+            loginBtn.innerHTML = '<div class="loading"></div> กำลังเข้าสู่ระบบ...';
+            loginBtn.disabled = true;
+            
+            try {
+                const result = await google.script.run
+                    .withSuccessHandler(handleLoginSuccess)
+                    .withFailureHandler(handleLoginError)
+                    .login(username, password);
+            } catch (error) {
+                console.error('Login error:', error);
+                showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
+                
+                // Reset button
+                loginBtn.innerHTML = 'เข้าสู่ระบบ';
+                loginBtn.disabled = false;
+            }
+        }
+
+        function handleLoginSuccess(result) {
+            const loginBtn = document.getElementById('loginBtn');
+            
+            if (result.success) {
+                currentUser = result.user.username;
+                currentRole = result.user.role;
+                
+                sessionStorage.setItem('currentUser', currentUser);
+                sessionStorage.setItem('currentRole', currentRole);
+                
+                showDashboard();
+                loginError.classList.add('hidden');
+            } else {
+                showToast(result.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 'error');
+                loginError.classList.add('hidden');
+            }
+            
+            // Reset button
+            loginBtn.innerHTML = 'เข้าสู่ระบบ';
+            loginBtn.disabled = false;
+        }
+
+        function handleLoginError(error) {
+            console.error('Login error:', error);
+            showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
+            
+            // Reset button
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.innerHTML = 'เข้าสู่ระบบ';
+            loginBtn.disabled = false;
+        }
+
+        function handleLogout() {
+            sessionStorage.removeItem('currentUser');
+            sessionStorage.removeItem('currentRole');
+            currentUser = null;
+            currentRole = null;
+            showLogin();
+        }
+
+        function showLogin() {
+            loginPage.classList.remove('hidden');
+            dashboard.classList.add('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        function showDashboard() {
+            loginPage.classList.add('hidden');
+            dashboard.classList.remove('hidden');
+            
+            // Update user info
+            userInfo.textContent = `${currentUser} (${currentRole === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้'})`;
+            
+            // Show/hide admin features
+            if (currentRole === 'admin') {
+                manageUsersBtn.classList.remove('hidden');
+            } else {
+                manageUsersBtn.classList.add('hidden');
+            }
+            
+            loadDashboardData();
+        }
+
+        function loadDashboardData() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        // Update server stats
+                        document.getElementById('server1Files').textContent = result.data.server1Files || 0;
+                        document.getElementById('server2Files').textContent = result.data.server2Files || 0;
+                        document.getElementById('server3Files').textContent = result.data.server3Files || 0;
+                        
+                        // Cache files data
+                        filesCache = result.data.files || [];
+                        
+                        // Load files table
+                        loadFiles();
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error loading dashboard data:', error);
+                })
+                .getDashboardData(currentUser, currentRole);
+        }
+
+        function loadFiles() {
+            const filesTable = document.getElementById('filesTable');
+            let filesToShow = filesCache;
+            
+            // If user role, only show their files
+            if (currentRole === 'user') {
+                filesToShow = filesCache.filter(f => f.owner === currentUser);
+            }
+            
+            if (filesToShow.length === 0) {
+                filesTable.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">ไม่มีไฟล์</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            filesTable.innerHTML = filesToShow.map(file => `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${file.filename}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span class="server-badge ${file.server}">${file.server.toUpperCase()}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.owner}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.size}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.uploadDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <button class="text-blue-600 hover:text-blue-900 mr-3" onclick="downloadFile('${file.fileId}', '${file.filename}')">ดาวน์โหลด</button>
+                        ${(currentRole === 'admin' || file.owner === currentUser) ? `<button class="text-red-600 hover:text-red-900" onclick="deleteFile('${file.fileId}', '${file.filename}')">ลบ</button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function handleFileUpload(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const serverSelect = document.getElementById('serverSelect');
+            const uploadSubmitBtn = document.getElementById('uploadSubmitBtn');
+            
+            if (!fileInput.files[0]) {
+                showToast('กรุณาเลือกไฟล์', 'warning');
+                return;
+            }
+            
+            if (!serverSelect.value) {
+                showToast('กรุณาเลือกเซิร์ฟเวอร์', 'warning');
+                return;
+            }
+            
+            // Show loading
+            uploadSubmitBtn.innerHTML = '<div class="loading"></div> กำลังอัปโหลด...';
+            uploadSubmitBtn.disabled = true;
+            
+            try {
+                const file = fileInput.files[0];
+                
+                // Convert file to base64
+                const base64 = await fileToBase64(file);
+                
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            loadDashboardData();
+                            uploadModal.classList.add('hidden');
+                            
+                            // Reset form
+                            fileInput.value = '';
+                            serverSelect.value = '';
+                            
+                            showToast('อัปโหลดไฟล์สำเร็จ!', 'success');
+                        } else {
+                            showToast('เกิดข้อผิดพลาดในการอัปโหลด: ' + (result.message || 'ไม่ทราบสาเหตุ'), 'error');
+                        }
+                        
+                        // Reset button
+                        uploadSubmitBtn.innerHTML = 'อัปโหลด';
+                        uploadSubmitBtn.disabled = false;
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Upload error:', error);
+                        showToast('เกิดข้อผิดพลาดในการอัปโหลด', 'error');
+                        
+                        // Reset button
+                        uploadSubmitBtn.innerHTML = 'อัปโหลด';
+                        uploadSubmitBtn.disabled = false;
+                    })
+                    .uploadFile(file.name, base64, currentUser, file.type, serverSelect.value);
+                    
+            } catch (error) {
+                console.error('Upload error:', error);
+                showToast('เกิดข้อผิดพลาดในการอัปโหลด', 'error');
+                
+                // Reset button
+                uploadSubmitBtn.innerHTML = 'อัปโหลด';
+                uploadSubmitBtn.disabled = false;
+            }
+        }
+        
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function loadUsers() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        usersCache = result.data;
+                        const usersTable = document.getElementById('usersTable');
+                        
+                        if (usersCache.length === 0) {
+                            usersTable.innerHTML = `
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">ไม่มีผู้ใช้</td>
+                                </tr>
+                            `;
+                            return;
+                        }
+                        
+                        usersTable.innerHTML = usersCache.map(user => `
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.username}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}">
+                                        ${user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                        ${user.status === 'active' ? 'ใช้งาน' : 'ปิดใช้งาน'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-3" onclick="editUser('${user.username}')">แก้ไข</button>
+                                    <button class="text-yellow-600 hover:text-yellow-900 mr-3" onclick="resetPassword('${user.username}')">รีเซ็ตรหัส</button>
+                                    <button class="text-red-600 hover:text-red-900" onclick="deleteUser('${user.username}')">ลบ</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error loading users:', error);
+                })
+                .getUsers();
+        }
+
+        function handleAddUser(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+            const role = document.getElementById('newRole').value;
+            const submitBtn = document.getElementById('submitAddUser');
+            
+            // Show loading
+            submitBtn.innerHTML = '<div class="loading"></div> กำลังเพิ่มผู้ใช้...';
+            submitBtn.disabled = true;
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        loadUsers();
+                        document.getElementById('addUserModal').classList.add('hidden');
+                        
+                        // Reset form
+                        document.getElementById('newUsername').value = '';
+                        document.getElementById('newPassword').value = '';
+                        document.getElementById('newRole').value = 'user';
+                        
+                        showToast('เพิ่มผู้ใช้สำเร็จ!', 'success');
+                    } else {
+                        showToast('เกิดข้อผิดพลาด: ' + (result.message || 'ไม่สามารถเพิ่มผู้ใช้ได้'), 'error');
+                    }
+                    
+                    // Reset button
+                    submitBtn.innerHTML = 'เพิ่มผู้ใช้';
+                    submitBtn.disabled = false;
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error adding user:', error);
+                    showToast('เกิดข้อผิดพลาดในการเพิ่มผู้ใช้', 'error');
+                    
+                    // Reset button
+                    submitBtn.innerHTML = 'เพิ่มผู้ใช้';
+                    submitBtn.disabled = false;
+                })
+                .addUser(username, password, role, 'active');
+        }
+
+        function editUser(username) {
+            const user = usersCache.find(u => u.username === username);
+            if (user) {
+                const newRole = confirm('เป็นผู้ดูแลระบบหรือไม่?') ? 'admin' : 'user';
+                const newStatus = confirm('ใช้งานหรือไม่?') ? 'active' : 'inactive';
+                
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            loadUsers();
+                            showToast('แก้ไขผู้ใช้สำเร็จ!', 'success');
+                        } else {
+                            showToast('เกิดข้อผิดพลาด: ' + (result.message || 'ไม่สามารถแก้ไขผู้ใช้ได้'), 'error');
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Error updating user:', error);
+                        showToast('เกิดข้อผิดพลาดในการแก้ไขผู้ใช้', 'error');
+                    })
+                    .updateUser(username, newRole, newStatus);
+            }
+        }
+
+        function resetPassword(username) {
+            const newPassword = prompt('รหัสผ่านใหม่:');
+            if (newPassword) {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            showToast('รีเซ็ตรหัสผ่านสำเร็จ!', 'success');
+                        } else {
+                            showToast('เกิดข้อผิดพลาด: ' + (result.message || 'ไม่สามารถรีเซ็ตรหัสผ่านได้'), 'error');
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Error resetting password:', error);
+                        showToast('เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน', 'error');
+                    })
+                    .resetPassword(username, newPassword);
+            }
+        }
+
+        function deleteUser(username) {
+            if (confirm(`ต้องการลบผู้ใช้ ${username} หรือไม่?`)) {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            loadUsers();
+                            showToast('ลบผู้ใช้สำเร็จ!', 'success');
+                        } else {
+                            showToast('เกิดข้อผิดพลาด: ' + (result.message || 'ไม่สามารถลบผู้ใช้ได้'), 'error');
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Error deleting user:', error);
+                        showToast('เกิดข้อผิดพลาดในการลบผู้ใช้', 'error');
+                    })
+                    .deleteUser(username);
+            }
+        }
+
+        function downloadFile(fileId, filename) {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        // Open download URL in new tab
+                        window.open(result.data.downloadUrl, '_blank', 'noopener,noreferrer');
+                        showToast('เริ่มดาวน์โหลดไฟล์แล้ว', 'success');
+                    } else {
+                        showToast('ไม่สามารถดาวน์โหลดไฟล์ได้: ' + (result.message || 'ไม่ทราบสาเหตุ'), 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Download error:', error);
+                    showToast('เกิดข้อผิดพลาดในการดาวน์โหลด', 'error');
+                })
+                .downloadFile(fileId);
+        }
+
+        function deleteFile(fileId, filename) {
+            if (confirm(`ต้องการลบไฟล์ ${filename} หรือไม่?`)) {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            loadDashboardData();
+                            showToast('ลบไฟล์สำเร็จ!', 'success');
+                        } else {
+                            showToast('เกิดข้อผิดพลาด: ' + (result.message || 'ไม่สามารถลบไฟล์ได้'), 'error');
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Error deleting file:', error);
+                        showToast('เกิดข้อผิดพลาดในการลบไฟล์', 'error');
+                    })
+                    .deleteFile(fileId, filename);
+            }
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9870c83a1421ce4a',t:'MTc1OTIwNDQ5OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
